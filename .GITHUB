@@ -8,10 +8,11 @@ cd /var/tmp/garray
 #cp ~/garray/* . -R # Coding and copy files locally in ./garray
 git add .	# add files to Index and it will be available for later undoing
 git commit -m "comment"	# make a snapshot of the current state as HEAD
-git push origin master	# push the current state onto remote server
+git push origin master	# push current state onto remote server
 
 ## Useful commands
-git init	# initialize a new git repository (on remote server)
+ssh -T git@github.com	# Confirm RSA keys working
+git init	# Initialize a new git repository (on remote server)
 git remote -v	# List the remote server of this working space
 
 ## Basic idea

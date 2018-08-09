@@ -19,3 +19,4 @@ Description: Organize a so-called ragged array as generalized arrays, which
 License: GPL-3
 Encoding: UTF-8
 RoxygenNote: 6.1.0
+Roxygen: list(markdown=TRUE)

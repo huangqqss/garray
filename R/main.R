@@ -1,108 +1,75 @@
 #options(error=recover)
-# R do vector to vector calculation, but has convention on how vectors
-#	should be recycled or truncated.  For convinient, *apply() do special
-#	map and reduce, in which: apply for array to vector,
-#	{l,s,v}apply for vector to vector,
-#	mapply for many vector to vector (and utilized by Vectorize()),
-#	tapply for typed groups to array, rapply for recursive apply, and
-#	eapply for environment apply.
-#	outer() for vector x vector to array mapping, but need
-#	vectorized FUN(); it actually takes care of the dimensions only.
-#	package:Jmisc oapply() for 2 vectors to matrix, built on
-#	expand.grid() and mapply.
-# In addition, for a jagged (ragged) array R can
-#	(1) have a list, and each sublist is the members of a group, which is
-#	unconvinient (most math function not accepts list) but most flexible,
-#	running with lapply() (also ref. package:rowr);
-#	(2) have a vector (values) recording all members and another (index)
-#	vector recording the grouping, running with tapply() (and by/aggregate);
-#	(3) have a matrix where each column/row is for a group and short groups
-#	are filled with placeholder like NA.
-#	Representations of (1) and (2) are inter-convertable via stack/unstack.
-#	Map and reduce for (2) seems handy and can be less flexible than
-#	tapply(), since the grouping is continuous and is repeating,
-#	naturally when members among groups are actually similar.
-# attr(X, "sdim") is a named list, each name is prefixed with a 
-#	margin (or exactly equal to one), and each value denotes the
-#	repeating times of subdim residing in the coresponding dimension
-#	(called superdim). 
-#	More than 1 subdim reside in the same superdim is allowed.
-#	This feature allows dividing a subdim further, organizing the subdims
-#	into hierachy.  I need to clarify operation on sdim means whether
-#	operating within every group independently (similar to apply(MARGIN))
-#	or operating among groups, maintaining the contain of a group
-#	(using apply() achieves this via apply() on the other margins, but
-#	for sdim, there is no complement margin); similarly, should the length
-#	of a sdim be the sizes of groups or the number of groups?
-#	It seems the first convention is compatible with apply().
-#	A still problem is that attributes in R are fragile, even indexing
-#	will drop most attributes.
-# package:lambda.tools allows block operations and two-dimensional map/fold,
-#	but they are never generalized and smart.
-#	package:tensorA is smart in the same manner but not generalized
-#	(and `[.tensor` seems broken).
-# Design:
-#	* Naming convention: "simple array" - object that is.array() is TRUE;
-#	  "generalized array" - object that is.garray() is TRUE;
-#	  "array" - generalized array, especially in issued message;
-#	* In this world, only 2 types of data are welcome: array and scalar.
-#	* Most functions also work for simple array, with warnings.
-#	* Attribute "sdim" of simple array are neglected (since no superdim).
-#	* Attribute class="garray" is almost only for method dispatching.
-#	  The validity of a generalized array in fact depends on the
-#	  correctness of dimnames, which is tested by `is.garray()`.
-# Vocabulary:
-#	Context	code	message		help	
-#	array	array	simple array	simple array
-#	garray	garray	array		generalized array
-#	sdim	sdim	sub-dimension	subdim
-# CAVEAT:
-#	* R's Native `%*%` multiples arrays (dim>2, and same lengths) as
-#	  inner product of vectors, resulting a scalar.
-#	* R seldom uses names(dim()) but save it.  However, some functions 
-#	  discard it, like: t().  I will totally neglect it.
-#	* Some R's Native functions (`%*%`/crossprod/apply) do not save values 
-#	  of dimnames() if it is NULL evne thouth with names (margins).
-#	* R's native `dim<-` should always go before `dimnames<-`. 
-#	  Whenever `dim<-` is called, attribute `dimnames` gets removed.
-#	  `dim.garray<-` tries to save dimnames as many as possible.
 
 #' Generalized and smart array
 #'
 #' Creates or tests for generalized arrays.
 #'
-#' They are generalized because they handle dimensions and subdimensions that
-#'	are ragged; and they are smart
+#' Generalized arrays are generalized because they handle dimensions and
+#'	subdimensions that are ragged; and they are also smart
 #'	because they automatically match dimensions by margins
 #'	(names of dimnames).
-#'	Attribute sdim denotes subdimensions, which are the subdivision of
+#' Margins is implemented similar to R's native class "table", i.e.,
+#'	use names of dimnames to store the margins
+#'
+#' Attribute sdim denotes subdimensions, which are the subdivision of
 #'	dimensions or grouping of members of a dimension, for organizing a
 #'	ragged array.
-#' Implementation of garray is most similar to R's native class "table", i.e.,
-#'	use names of dimnames to store the margins
+#'	It is a named list of numeric vectors, each of which indicates the
+#'	lengths of subdivision groups within a dimension.  Every name of the
+#'	list prefixed with a margin of the generalized array. By the matching
+#'	of sdim names and dim names, utility functions figure out which
+#'	dimensions the sub dimensions reside in.  Summary of a vector of the
+#'	list usually equals to the extent of the corresponding dimension.
+#'	If they are not equal and the extent can not be divided exactly
+#'	by the summary, the subdimension is invalid and will be dropped.
+#'	If the extent can be divided exactly
+#'	by the summary, the subdimension is still valid but non-canonical.
+#'	Non-canonical subdimension can be provided to `garray()` and `sdim<-`
+#'	as argument, and the two functions can canonicalize it.
+#'	Other utility functions cannot handle non-canonical subdimension.
+#'	Values of each vector of the list denotes the
+#'	repeating times of subdimension residing in the coresponding dimension
+#'	(called superdim). 
+#'	More than 1 subdimension reside in the same superdim is allowed.
+#'	This feature allows dividing a subdimension further,
+#'	organizing the subdims
+#'	into hierachy.
+#'
 #' By definition and for S3 dispatching, `class(.)="garray"` is required, but
 #'	simple arrays with proper margins actually work correctly with most
 #'	functionalities of this package.  For the sake of compatibility and
 #'	reducing warning message, `is.garray.duck()` tests whether the array
 #'	has proper margins.
+#'
+#' A still problem is that attributes in R are fragile, even indexing
+#'	will drop most attributes.  Utility functions and methods for
+#'	dispatching for 'garray' implemented in this package guaranttee to
+#'	save the margins (names of dimnames) and subdimension (attr(*,'sdim')).
+#' @param data  Usually a simple array, and can be a vector without dimensions.
 #' @param dim  An integer vector giving the maximal indices in each dimension.
 #' @param dimnames  A list (or it will be ignored) with for each dimension
 #'	one component, either ‘NULL’ or a character vector.
 #' @param margins  Override the names of dim and of dimnames.
+#' @param sdim  Optional, a named list of numeric vectors indicating the
+#'	subdivision of some of the dimensions.  The value vill become,
+#'	after validated, the attribute sdim.  See 'Details'
+#'	and '?sdim'.
+#' @param x  An R object.
+#' @param ...  Additional arguments to be passed to or from methods.
 #' @examples
 #'	a1 <- garray(1:27, c(A=3,B=9), sdim=list(A1=c(a=2,b=1),B1=c(a=3)))
 #'	a2 <- garray(1:27, c(A=3,B=9), sdim=list(A1=c(a=2,b=1),B1=c(a=4)))
-garray <- function(X, dim=NULL, dimnames=NULL,
-		margins=NULL, sdim=attr(X, "sdim", exact=TRUE)) {
+garray <- function(data, dim=NULL, dimnames=NULL,
+		margins=NULL, sdim=attr(data, "sdim", exact=TRUE)) {
 	if (is.null(dim)) {
-		X <- as.array(X) 
-		d <- dim(X)	# array() keeps the names of dim.
-		dn <- if (is.null(dimnames)) dimnames(X) else dimnames
+		data <- as.array(data) 
+		d <- dim(data)	# array() keeps the names of dim.
+		dn <- if (is.null(dimnames)) dimnames(data) else dimnames
 	} else {
 		d <- dim
 		names(dim) <- NULL
-		X <- array(X, dim, dimnames)
-		dn <- dimnames(X)
+		data <- array(data, dim, dimnames)
+		dn <- dimnames(data)
 	}
 	if (is.null(dn)) dn <- vector("list", length(d))
 	if (is.null(margins)) {
@@ -111,52 +78,64 @@ garray <- function(X, dim=NULL, dimnames=NULL,
 			else stop("need margins")
 	}
 	names(dn) <- margins
-	dimnames(X) <- dn
-	class(X) <- "garray"
-	sdim(X) <- sdim
-	X
+	dimnames(data) <- dn
+	class(data) <- "garray"
+	sdim(data) <- sdim
+	data
 }
 
 #' @describeIn garray  A simple and faster version of garray(),
 #'	mainly for internal usage.  Note that garray() is not generic function,
 #'	thus garray.array() will never be called by dispatching.
-garray.array <- function(X, sdim) {
-	class(X) <- "garray"
-	stopifnot(is.garray.loose(X))
-	sdim(X) <- sdim
-	X
+garray.array <- function(x, sdim) {
+	class(x) <- "garray"
+	stopifnot(is.garray.duck(x))
+	sdim(x) <- sdim
+	x
 }
 
 #' @rdname garray
-as.garray <- function(X, ...) UseMethod("as.garray")
+as.garray <- function(x, ...) UseMethod("as.garray")
 
 #' @rdname garray
-as.garray.garray <- function(X, ...)
-	if (is.garray(X)) X else stop("broken array")
+as.garray.garray <- function(x, ...)
+	if (is.garray(x)) x else stop("broken array")
+# Issuing a stop because this function is called by S3 dispatching.
 
 #' @rdname garray
-as.garray.default <- function(X, ...) garray(X, ...)
+as.garray.default <- function(x, ...) garray(x, ...)
 
 #' @describeIn garray  `is.garray` do simple validation, no check for validity
 #'	of sdim because it is too expensive. 
 #'	Operation of sdim by this package is always guaranteed the validity.
-is.garray <- function(X) {
-	n <- names(dimnames(X))
-	is.array(X)&&!is.null(n)&&!anyNA(n)&&all(""!=n)&&inherits(X, "garray")
+is.garray <- function(x) {
+	n <- names(dimnames(x))
+	is.array(x)&&!is.null(n)&&!anyNA(n)&&all(""!=n)&&inherits(x, "garray")
 	#warning("a valid array but no class")
 }
 
-#' @rdname garray
-is.garray.duck <- function(X) {
-	n <- names(dimnames(X))
-	is.array(X)&&!is.null(n)&&!anyNA(n)&&all(""!=n)
+#' @describeIn garray  `is.garray.duck` do duck-typing validation, ignoring
+#'	the class
+is.garray.duck <- function(x) {
+	n <- names(dimnames(x))
+	is.array(x)&&!is.null(n)&&!anyNA(n)&&all(""!=n)
 }	# duck-typing validation without warning
 
-# @describeIn garray  Convert a 2D generalized array into a data.frame,
-#	making `print()` work correctly.
-as.data.frame.garray <- function(x, row.names=NULL, col.names=NULL, ...,
-		stringsAsFactors=FALSE) {
-	stopifnot(2==length(dim(x)))	# Make View(X) work for 2-D array.
+#' @describeIn garray  Test whether the vector or array is actually a scalar
+#'	(`length(x)==1L`).
+is.scalar <- function(x) { 1L==length(x) }
+
+#' Coerce to a Data Frame
+#'
+#' Convert a 2D generalized array into a data.frame,
+#'	making `print()` work correctly.
+#' @param x  A generalized array object.
+#' @param row.names,optional,stringsAsFactors,...  See the same arguments in
+#'	?as.data.frame.
+#' @param col.names  'NULL' or a character vector giving the column names.
+as.data.frame.garray <- function(x, row.names=NULL, optional=FALSE,
+		col.names=NULL, ..., stringsAsFactors=FALSE) {
+	stopifnot(2==length(dim(x)))	# Make View(x) work for 2-D array.
 	row.names <- if (is.null(row.names)) rownames(x)
 	col.names <- if (is.null(col.names)) colnames(x)
 	if (!is.null(spd <- .superdim(x))) {
@@ -175,19 +154,19 @@ as.data.frame.garray <- function(x, row.names=NULL, col.names=NULL, ...,
 			colnames(x) <- col.names
 		}	# as.data.frame.matrix() not has option col.names
 	}
-	as.data.frame.matrix(unclass(x), row.names=row.names, ...)
+	as.data.frame.matrix(unclass(x), row.names, optional, ...)
 }
 
-# @describeIn garray  Print out a generalized array.
-print.garray <- function(X, ...) {
-	dn <- dimnames(X)
+#' Print Values
+#'
+#' Print out a generalized array and returns it _invisibly_.
+#' @param x  A generalized array object.
+#' @param ...  Additional arguments to be passed to or from methods.
+print.garray <- function(x, ...) {
+	dn <- dimnames(x)
 	if (1==length(dn)&&is.null(dn[[1]])) cat(names(dn), sep="\n")
 	NextMethod("print")
 }
-
-# @describeIn garray  Test whether the vector or array is actually a scalar
-#	(`length(.)==1L`).
-is.scalar <- function(X) { 1L==length(X) }
 
 
 #' The margins and dimensions of a generalized array object
@@ -199,46 +178,53 @@ is.scalar <- function(X) { 1L==length(X) }
 #'	so, `remargins` may also keep sdim.  `margins<-` always removes sdim.
 #'	For `remargins` the length of value can be shorter than that of the
 #'	margins if the value has names.
-margins <- function(X) {
-	if (!is.garray(X)) stop("margins of invalid array may be incorrect")
-	names(dimnames(X))
+#' @param x  A generalized array.
+#' @param value  A character vector will become the margins (names of dimnames)
+#'	of the generalized array.
+#'	`margins<-` ignores the names of `value` while
+#'	`remargins` according to the names of `value` renames the margins.
+#'	For `remargins` the length of value can be shorter than that of the
+#'	margins if the value has names.
+margins <- function(x) {
+	if (!is.garray(x)) stop("margins of invalid array may be incorrect")
+	names(dimnames(x))
 }
 # `margins()` used to be `names()`, but I realized that even an array
 #	can have attribute `names`, which is by default retieved by `names()`.
 
 #' @rdname margins
-`margins<-` <- function(X, value) {
-	if (!is.array(X)) {
+`margins<-` <- function(x, value) {
+	if (!is.array(x)) {
 		stop("set margins of non-array")
 	} else {
-		if (!inherits(X, "garray")) class(X) <- "garray"
+		if (!inherits(x, "garray")) class(x) <- "garray"
 	}	# try fix it.
 	if (is.null(value)||anyNA(value)||any(""==value))
 		stop("illegal margins")
-	dn <- dimnames(X)
+	dn <- dimnames(x)
 	if (is.null(dn)) dn <- vector("list", length(value))
-	attr(X, "sdim") <- NULL
+	attr(x, "sdim") <- NULL
 	names(dn) <- value
-	dimnames(X) <- dn	# if value not match dim(X), stop here
-	X
+	dimnames(x) <- dn	# if value not match dim(x), stop here
+	x
 }
 
 #' @rdname margins
-remargins <- function(X, value, warn=TRUE) {
-	if (!is.array(X)) {
+remargins <- function(x, value) {
+	if (!is.array(x)) {
 		stop("set margins of non-array")
 	} else {
-		if (!inherits(X, "garray")) class(X) <- "garray"
+		if (!inherits(x, "garray")) class(x) <- "garray"
 	}	# try fix it.
 	if (is.null(value)||anyNA(value)||any(""==value))
 		stop("illegal margins")
-	dn <- dimnames(X)
+	dn <- dimnames(x)
 	if (is.null(dn)) {
 		dn <- vector("list", length(value))
 	} else if (!is.null(nn <- names(value))) {
-		sd <- sdim(X)
+		sd <- sdim(x)
 		if (!is.null(sd)) {
-			spd <- .superdim(X)
+			spd <- .superdim(x)
 			names(sd) <- vapply(names(sd), function(k) {
 				if (spd[k]%in%nn) substr(k, 1, length(spd[k])
 					) <- value[spd[k]]
@@ -249,13 +235,13 @@ remargins <- function(X, value, warn=TRUE) {
 		value <- value[m]
 		m[!is.na(value)] <- value[!is.na(value)]
 		value <- m
-		attr(X, "sdim") <- sd
+		attr(x, "sdim") <- sd
 	} else {
-		attr(X, "sdim") <- NULL
+		attr(x, "sdim") <- NULL
 	}
 	names(dn) <- value
-	dimnames(X) <- dn
-	X
+	dimnames(x) <- dn
+	x
 }
 
 #' Dimensions of a generalized array
@@ -267,21 +253,25 @@ remargins <- function(X, value, warn=TRUE) {
 #'	returns and setting with the named dimensions (margins).  The two
 #'	function is usually used as, for example, `dim(arr)` and
 #'	`dim(arr) <- c(A=3,B=2)`.
-#' @param X  An generalized array.
+#' Native R saves the names of dim but seldom uses it.  However, it is
+#'	undocumented and not stable because some functions 
+#'	  discard it (like: t()) .  This package will totally neglect it but
+#'	keeps the margins in dimnames.
+#' @param x  An generalized array.
 #' @param value  An integer (can be coerced from double numeric) vector, with
 #'	names.
-`dim.garray` <- function(X) {
+`dim.garray` <- function(x) {
 	d <- NextMethod("dim")
-	names(d) <- margins(X)	# names of dim() is kept by dimnames(). 
-	d	# dim(X) can have names, but I do not respect it.
+	names(d) <- margins(x)	# names of dim() is kept by dimnames(). 
+	d	# dim(x) can have names, but I do not respect it.
 }
 
 #' @rdname dim.garray
-`dim<-.garray` <- function(X, value) {
+`dim<-.garray` <- function(x, value) {
 	n <- names(value)
 	if (is.null(n)||anyNA(n)||any(""==n)) {
 		warning("array assigned dim without names")
-		class(X) <- NULL
+		class(x) <- NULL
 		# Passing garray object into a function that not awares of
 		#	garray and changes dim may issue the warning.  To avoid
 		#	it, unclass() the object and then passing.
@@ -289,11 +279,11 @@ remargins <- function(X, value, warn=TRUE) {
 	} else {
 		dn <- vector("list", length(n))
 		names(dn) <- n
-		dn[n] <-dimnames(X)[n]	# save dimnames
-		names(value) <- NULL	# keep names(attr(X,"dim")) NULL
-		X <- NextMethod("dim<-")	# default dim() remove dimnames
-		dimnames(X) <- dn
-		X
+		dn[n] <-dimnames(x)[n]	# save dimnames
+		names(value) <- NULL	# keep names(attr(x,"dim")) NULL
+		x <- NextMethod("dim<-")	# default dim() remove dimnames
+		dimnames(x) <- dn
+		x
 	}
 }
 
@@ -321,32 +311,31 @@ remargins <- function(X, value, warn=TRUE) {
 #'	R's native `[`, a garray will become a garray or scalar, never a vector.
 #' @param value  An array or a scalar.
 #' @examples
-#' require(garray)
-#' mm <- matrix(c(1:3,1), 2, 2, dimnames=list(NULL, c("B","A")))
-#' a <- garray(1:27, c(A=3,B=9), sdim=list(A1=c(a=2,b=1),B1=c(a=3)))
-#' b <- a[mm]
-#' c1 <- a[B=1:2,A=NULL]
-#' c2 <- a[B=1:2,A=]
-#' c3 <- a[B=1:2]
-#' c4 <- a[list(B=1:2)]
-#' c5 <- a[list(B=1:2,A=NULL)]
-#' c6 <- a[list(NULL,1:2)]
-#' d1 <- a[,] ; d1[B=1:2,A=NULL]       <- c1*10
-#' d2 <- a[,] ; d2[B=1:2,A=]           <- c1*10
-#' d3 <- a[,] ; d3[B=1:2]              <- c1*10
-#' d4 <- a[,] ; d4[list(B=1:2)]        <- c1*10
-#' d5 <- a[,] ; d5[list(B=1:2,A=NULL)] <- c1*10
-#' d6 <- a[,] ; d6[B=1:2,A=NULL] <- 1
-#' d7 <- a[,] ; d7[mm] <- 1000
-#' d8 <- a[,] ; d8[mm] <- 1:2*1000
-#' e1 <- a[A1=1,drop=FALSE]
-#' e2 <- a[A1="b",drop=FALSE]
-#' e3 <- a[,] ; e3[A1="b"] <- e2*10
-#' e4 <- a[A=c(TRUE,FALSE,FALSE),drop=FALSE]
-#' e5 <- a[A=TRUE,drop=FALSE]
-#' e6 <- a[B=c(TRUE,FALSE,FALSE),drop=FALSE]
-#' e7 <- a[A1=TRUE,drop=FALSE]
-#' e8 <- a[A1=c(TRUE,FALSE),drop=FALSE]
+#'	mm <- matrix(c(1:3,1), 2, 2, dimnames=list(NULL, c("B","A")))
+#'	a <- garray(1:27, c(A=3,B=9), sdim=list(A1=c(a=2,b=1),B1=c(a=3)))
+#'	b <- a[mm]
+#'	c1 <- a[B=1:2,A=NULL]
+#'	c2 <- a[B=1:2,A=]
+#'	c3 <- a[B=1:2]
+#'	c4 <- a[list(B=1:2)]
+#'	c5 <- a[list(B=1:2,A=NULL)]
+#'	c6 <- a[list(NULL,1:2)]
+#'	d1 <- a[,] ; d1[B=1:2,A=NULL]       <- c1*10
+#'	d2 <- a[,] ; d2[B=1:2,A=]           <- c1*10
+#'	d3 <- a[,] ; d3[B=1:2]              <- c1*10
+#'	d4 <- a[,] ; d4[list(B=1:2)]        <- c1*10
+#'	d5 <- a[,] ; d5[list(B=1:2,A=NULL)] <- c1*10
+#'	d6 <- a[,] ; d6[B=1:2,A=NULL] <- 1
+#'	d7 <- a[,] ; d7[mm] <- 1000
+#'	d8 <- a[,] ; d8[mm] <- 1:2*1000
+#'	e1 <- a[A1=1,drop=FALSE]
+#'	e2 <- a[A1="b",drop=FALSE]
+#'	e3 <- a[,] ; e3[A1="b"] <- e2*10
+#'	e4 <- a[A=c(TRUE,FALSE,FALSE),drop=FALSE]
+#'	e5 <- a[A=TRUE,drop=FALSE]
+#'	e6 <- a[B=c(TRUE,FALSE,FALSE),drop=FALSE]
+#'	e7 <- a[A1=TRUE,drop=FALSE]
+#'	e8 <- a[A1=c(TRUE,FALSE),drop=FALSE]
 `[.garray` <- function(..., drop=TRUE) {
 	n <- margins(..1)
 	arg <- match.call()[-c(1:2)]	# fast sys.call() not work for `[`(...)
@@ -437,25 +426,25 @@ remargins <- function(X, value, warn=TRUE) {
 	Z
 }
 
-.index_canonical <- function(X, idx) {
+.index_canonical <- function(x, idx) {
 # In the extension style of indexing, I use NULL to denote something like
 #	MissingArg and avoid non-standard evaluation in this function.
-	n <- margins(X)
+	n <- margins(x)
 	idxn <- names(idx)
 	if (is.list(idx[[1]])&&(is.null(idxn)||""==idxn[1])) {
 		stopifnot(1==length(idx))
 		idx <- idx[[1]]
 		if (is.null(names(idx))) return(idx) else idxn <- names(idx)
 	}
-	d <- dim(X)
+	d <- dim(x)
 	l <- vector("list", length(n))
 	l[] <- list(NULL)
 	names(l) <- n
 	idx_not_sd <- idxn%in%n
 	l[idxn[idx_not_sd]] <- idx[idx_not_sd]
 	if (!all(idx_not_sd)) {
-		spd <- .superdim(X)
-		sd <- sdim(X)
+		spd <- .superdim(x)
+		sd <- sdim(x)
 		for (k in idxn[!idx_not_sd]) {
 			reptimes <- sd[[k]]
 			if (is.null(reptimes))
@@ -473,37 +462,44 @@ remargins <- function(X, value, warn=TRUE) {
 }
 
 
-#' Subdim of an array
+#' Subdimensions of an array
 #'
-#' Retireve or set the subdim of an array.
+#' Retireve or set the subdimension of an array.
 #'
-#' Validation of subdim is expensive because its consistency with dim need
+#' Validation of subdimension is expensive because its consistency with dim need
 #'	checking.  Thus most of functions do not validate it. 
-#'	Operations of subdim with functions discussed here are guaranteed to
+#'	Operations of subdimension with functions discussed here are guaranteed to
 #'	be always keeping the consistency.
-#' @return  A non-empty list or NULL
-sdim <- function(X) {
-	if (!is.garray(X)) {
+#' @param x  A generalized array.
+#' @param warn  Whether issue warning when some of subdimensions are invalid
+#'	and get dropped.
+#' @param value A named list of numeric vectors indicating the
+#'	subdivision of some of the dimensions.  The value vill become,
+#'	after validated, the attribute sdim.  See '?garray'.
+#' @return  The subdimensions (a non-empty list) or NULL
+sdim <- function(x) {
+	if (!is.garray(x)) {
 		warning("sdim of non-array cannot be retrieved")
 		return(NULL)
 	}
-	attr(X, "sdim", exact=TRUE)
+	attr(x, "sdim", exact=TRUE)
 }
 
 #' @rdname sdim
-`sdim<-` <- function(X, warn=TRUE, value) {
+`sdim<-` <- function(x, warn=TRUE, value) {
 	if (0L==length(value)) {
-		attr(X, "sdim") <- NULL
-		return(X)
+		attr(x, "sdim") <- NULL
+		return(x)
 	} else if (!is.list(value)) {
 		warning("sdim should be a non-empty list with names") 
-		return(X)
-	} else if (!is.garray(X)) warning("assign sdim to non-array object")
-	d <- dim.garray(X)
+		return(x)
+	} else if (!is.garray(x)) warning("assign sdim to non-array object")
+	d <- dim.garray(x)
 	spd <- .validate_sdim(d, value, warn=warn)
 	if (0L<length(spd)) {
-		nsd <- setNames(nm=names(spd))	# so lapply() return named list
-		attr(X, "sdim") <- lapply(nsd, function(k) {
+		nsd <- names(spd)
+		names(nsd) <- nsd	# so lapply() return named list
+		attr(x, "sdim") <- lapply(nsd, function(k) {
 			reptimes <- as.integer(value[[k]])
 			na <- names(value[[k]])
 			ti <- d[spd[k]]%/%sum(reptimes)
@@ -518,9 +514,9 @@ sdim <- function(X) {
 		# If `sdim<-`() always save canonical reptimes, I do not need
 		#	`rep(reptimes, length.out[k]/sum(sd[[k]]))` later.
 	} else {
-		attr(X, "sdim") <- NULL
+		attr(x, "sdim") <- NULL
 	}
-	X
+	x
 }
 
 
@@ -528,28 +524,28 @@ sdim <- function(X) {
 #
 # @param superdim  Named character.
 #	If a value is "" or NA, the name should be the name of some subdim. And
-#	if the reptimes of the subdim equal an integer, the subdim will be
+#	if the reptimes of the subdimension equal an integer, the subdimension will be
 #	elevated into a margin; if the reptimes are not equal, stop.
 #	If a value is some margin, the name should be some other margin,
-#	the later will become a subdim (renamed to "value.name") residing in
+#	the later will become a subdimension (renamed to "value.name") residing in
 #	the former margin.
-#TODO: resdim <- function(X, superdim) { }
+#TODO: resdim <- function(x, superdim) { }
 
 
 # Extract and validate superdim for compatible with subdim.
 #	Extract is cheap, but validation is expensive.
-.superdim <- function(X) {
-	sd <- sdim(X)
+.superdim <- function(x) {
+	sd <- sdim(x)
 	if (!is.list(sd) || 0L==length(sd)) return(character())
 	sd[] <- names(sd)	# sd has names, which is respected by vapply().
-	n <- margins(X)		# dim names (margins and superdim)
+	n <- margins(x)		# dim names (margins and superdim)
 	vapply(sd, function(k) n[startsWith(k, n)], "")
 	# If there are inconsistant superdim, vapply() will error.
 }
 .validate_sdim <- function(d, sd, warn=TRUE) {
 	if (!is.list(sd) || 0L==length(sd)) return(character())
 	n <- names(d)	# margins names (superdim), d can be dim of non garray
-	m <- names(sd)	# subdim names
+	m <- names(sd)	# subdimension names
 	stopifnot(is.numeric(d), !is.null(n), !anyNA(n), ""!=n,
 		!is.null(m), !anyNA(m), ""!=m)
 	starts <- outer(m, n, startsWith)
@@ -575,15 +571,17 @@ sdim <- function(X) {
 #' General array transposition
 #'
 #' Restore garray attributes that discarded by aperm.default().
-#'	Cannot permute between subdim (means to promote subdim of equal length
-#'	into regular dim and reduce dim into subdim), sorry.
+#'	Cannot permute between subdimension (means to promote subdimension of
+#'	equal length
+#'	into regular dim and reduce dim into subdimension), sorry.
+#' @param a  A generalized array to be transposed.
 #' @param perm  Desired margins after permutation, integer or character.
-#aperm <- function (a, perm, ...) UseMethod("aperm")
-aperm.garray <- function(X, perm=NULL) {
-	if (all(perm==margins(X))||all(perm==seq_along(margins(X)))) return(X)
-	Z <- aperm.default(a=X, perm=perm, resize=TRUE)
+#' @param ...  Useless, potential arguments inherited from the S3 generic.
+aperm.garray <- function(a, perm=NULL, ...) {
+	if (all(perm==margins(a))||all(perm==seq_along(margins(a)))) return(a)
+	Z <- aperm.default(a=a, perm=perm, resize=TRUE)
 	class(Z) <- "garray"
-	attr(Z, "sdim") <- attr(X, "sdim", exact=TRUE)	# no further validation
+	attr(Z, "sdim") <- attr(a, "sdim", exact=TRUE)	# no further validation
 	Z
 }
 
@@ -596,7 +594,7 @@ aperm.garray <- function(X, perm=NULL) {
 #' @param along  The dimension along which to bind the arrays. 
 #'	The arrays may have different lengths along that dimension,
 #'	and are bind along it, with addition `sdim` indicating the composition
-#'	of this dimension (creating a new subdim).  Some arrays may not have
+#'	of this dimension (creating a new subdimension).  Some arrays may not have
 #'	that margin, then the dimension of these arrays expand to 1.
 #'	If assign a new margin is created,
 #'	and will become last dimensions of output.
@@ -660,14 +658,14 @@ abind <- function(..., margins=NULL, along=character()) {
 # Simplified list to vector of some type (usually atomic) if possible
 # @param value1  A prototype of the return.
 # @return  An list (if impossible) or an simple array.
-.simplify2array <- function(X, value1=X[[1]]) {
-	if (!is.list(X)) stop("non-list need not simplifying")
-	l <- unique.default(lengths(X))
-	if (is.recursive(value1)) return(X)
+.simplify2array <- function(x, value1=x[[1]]) {
+	if (!is.list(x)) stop("non-list need not simplifying")
+	l <- unique.default(lengths(x))
+	if (is.recursive(value1)) return(x)
 	if (1!=length(l)||l!=length(value1)||is.null(value1)) {
-		#any(vapply(X, typeof, "")!=typeof(value1))	# time consume
+		#any(vapply(x, typeof, "")!=typeof(value1))	# time consume
 		warning("impossible to simplify the result to array")
-		return(X)
+		return(x)
 	}
 	if (is.array(value1)) {
 		d1 <- dim(value1)
@@ -682,29 +680,29 @@ abind <- function(..., margins=NULL, along=character()) {
 		d1 <- integer()
 		dn1 <- NULL
 	}	# if 0L==length(value1), dim(Z) will have 0 and 0==length(Z)
-	Z <- do.call("c", X)
-	dim(Z) <- c(d1, length(X))
+	Z <- do.call("c", x)
+	dim(Z) <- c(d1, length(x))
 	dimnames(Z) <- c(dn1, list(NULL))
 	Z
 }
 
 # @param length.out  The desired dimensions of the output. 
-#	Note that `length(length.out)==length(dim(X))` is mandatory.
-#	There are softwares that assume margins new to X to be 1 (like MATLAB
+#	Note that `length(length.out)==length(dim(x))` is mandatory.
+#	There are softwares that assume margins new to x to be 1 (like MATLAB
 #	and numpy for Python), and I once consider implement the feature,
 #	but I finally realize the feature is bug-prone and users do not need it.
 #	In circumstance the feature is useful (`amap` and `[<-`),
 #	I hard code it there.
-# @param sdim  Provide subdim for help matching dimensions of X and length.out.
-#	Usually `X` does not has such information.
-#	(X has dimensions smaller than length.out.  In function like `amap`,
+# @param sdim  Provide subdimension for help matching dimensions of x and length.out.
+#	Usually `x` does not has such information.
+#	(x has dimensions smaller than length.out.  In function like `amap`,
 #	this information is carried by arrays with larger dimensions).
-.rep.garray <- function(X, length.out, sdim=NULL) {
-	#tail=utils::tail(which(1<dim(X)), 1)
+.rep.garray <- function(x, length.out, sdim=NULL) {
+	#tail=utils::tail(which(1<dim(x)), 1)
 	# Dimension after that will not be repeated, mainly
 	#	because .mapply() will do repeating automatically and quickly. 
 	#	Use NULL to disable detecting of tail.
-	d <- dim(X)
+	d <- dim(x)
 	n <- names(d)
 	if (setequal(names(length.out), n)) {
 		length.out <- length.out[n]
@@ -713,13 +711,13 @@ abind <- function(..., margins=NULL, along=character()) {
 		names(length.out) <- n
 	}
 	stopifnot(length(length.out)==length(d), length.out>=d, 0L<d)
-	if (all(length.out==d)) return(X)
+	if (all(length.out==d)) return(x)
 	spd <- if (is.null(sdim)) character(0)
 		else .validate_sdim(length.out, sdim)
 	if (0==length(spd)||all(d==1L|d==length.out)) {
 		head <- which(d==length.out)
 		perm <- c(head, seq_along(length.out)[-head])
-		return(aperm(array(X, length.out[perm]), order(perm)))
+		return(aperm(array(x, length.out[perm]), order(perm)))
 	}	# sweep() does it in this manner, seems faster than .subset().
 	idx <- lapply(seq_along(d), function(i) {
 		if (d[i]==length.out[i]) NULL
@@ -728,9 +726,9 @@ abind <- function(..., margins=NULL, along=character()) {
 			j <- names(spd)[ii]
 			jj <- which(length.out[i]==vapply(sdim[j], sum, 0L)&
 				d[i]==vapply(sdim[j], length, 0L))
-			if (0L==length(jj)) stop("sub-dimension match none")
+			if (0L==length(jj)) stop("subdim match none")
 			if (1<length(jj)) {
-				warning("sub-dimension match many")
+				warning("subdim match many")
 				jj <- jj[1]
 			}
 			reptimes <- sdim[j][[jj]]
@@ -740,7 +738,7 @@ abind <- function(..., margins=NULL, along=character()) {
 	})
 	idx[d==length.out] <- list(quote(quote(expr=)))
 	#idx[vapply(idx, is.null, TRUE)] <- list(quote(quote(expr=)))
-	do.call(".subset", c(list(X), idx, drop=FALSE))
+	do.call(".subset", c(list(x), idx, drop=FALSE))
 }	# mainly for internal usage, thus return only data, no dimnames.
 
 
@@ -756,6 +754,8 @@ abind <- function(..., margins=NULL, along=character()) {
 #' @param ...  Usually in the form `psummary(x, y, z, FUN=sum, na.rm=TRUE)`,
 #'	alternaitvely `psummary(list(x, y, z), FUN=sum, na.rm=TRUE)`.
 psummary <- function(...) UseMethod("psummary")
+
+#' @rdname psummary
 psummary.garray <- function(...) {
 	dots <- list(...)
 	ifun <- which(vapply(dots, is.function, TRUE))
@@ -772,6 +772,8 @@ psummary.garray <- function(...) {
 	stopifnot(vapply(dots, is.atomic, TRUE))
 	do.call("amap", c(FUN, dots, args))
 }
+
+#' @rdname psummary
 psummary.default <- function(...) {
 	dots <- list(...)
 	ifun <- which(vapply(dots, is.function, TRUE))
@@ -809,6 +811,7 @@ psummary.default <- function(...) {
 #'	dimension.  Sometime aperm() is needed after this function.
 #'	Sparse table, where dimnames is not complete (unbalanced) and needs
 #'	non-fractionally recycling, is not supported.
+#' @param file  The name of the file to be read in, see ('file' in ?read.table).
 #' @param header  hierarchy structure of the header, a list of length 2,
 #'	assigning the index of row and col header,
 #'	affecting parsing of the input table;
@@ -824,20 +827,21 @@ psummary.default <- function(...) {
 #'	the same index in high dimension, while in the AOO pattern, the names
 #'	appear once at the first and the other cells that are in the same index
 #'	in high dimension are left blank; in the
-#'	output array, {row,col}.names are not necessary dimnames[[1]] and [[2]];
+#'	output array, {row,col}.names are not necessary `dimnames[[1]]` and
+#'	`dimnames[[2]]`;
 #'	if all elements of the list are a integer scalar, then the list can
 #'	also be coded as a integer vector (since they are the same for lapply);
+#' @param ...  Further arguments to be passed to ‘read.table’.
+#' @param storagemode  The storagemode of return matrix, usually 'double'.
 # @examples
 # express.prof <- read.ctable(
 #	file.path("http://deleteome.holstegelab.nl/data/downloads",
 #		"deleteome_responsive_mutants_ex_wt_var_controls.txt"),
 #	header=list(1:2, 1:3), sep="\t", quote="\"",
 #	row.names=list(1), col.names=list(2, 1))
-read.ctable <- function(file, header, sep="", quote="\"'",
-		dec=".", row.names, col.names, comment.char="#",
-		storagemode="double") {
-	dat <- read.table(file, header=FALSE, sep=sep, colClasses="character",
-		quote=quote, dec=dec, comment.char=comment.char)
+read.ctable <- function(file, header, row.names, col.names, ..., storagemode="double") {
+	dat <- utils::read.table(file, header=FALSE, dec=".",
+		colClasses="character", ...)
 	arr      <- unname(as.matrix(dat[-header[[1]],-header[[2]]]))
 	storage.mode(arr) <- storagemode
 	headrow  <- unname(as.matrix(dat[ header[[1]],-header[[2]]]))
@@ -876,18 +880,15 @@ read.ctable <- function(file, header, sep="", quote="\"'",
 #'	margin is matched. Unmatched margins are broadcasting like outer(). 
 #'	Scalar (length 1 vector) do not contribute margins and
 #'	not broadcast here (they will broadcast by `.mapply()` later).
+#' @param MoreArgs  a list of other arguments to 'FUN', no matching of margins.
+#' @param SIMPLIFY  logical, attempt to reduce the result to exclude recursive
+#'	structure (no list hierachy but plain generalized array).
 #' @param VECTORIZED  Whether FUN is vectorized will affect the behaviours.
 #'	Some combination of FUN and VECTORIZED is not simply slowing down,
 #'	but produces meaningless results or even stop (e.g., cumsum).
 #'	TRUE - call `FUN` once with arrays being reorganize on dimensions;
 #'	FALSE - call `FUN` many times (via `.mapply`), with each cell of arrays.
-#' @param SAFE 
-#'	FALSE - use unsafe but fast implementation, all inputs are repeated as
-#'	few as possible, assuming that `FUN` recycles short vectors
-#'	(like basic operators "+"). 
-#'	TRUE - slower, all inputs are organized properly to have the same
-#'	dimension and passed to FUN.  For VECTORIZED=FALSE, SAFE is neglected
-#'	because `.mapply` recycle short vectors.
+#' @param e1,e2  Generalized arrays, being operands.
 #' @return The dimensions is deduced from inputs.
 #' @examples
 #' a <- garray(1:24, c(4,6,2), dimnames=list(X=1:4, Y=letters[1:6], Z=NULL),
@@ -948,6 +949,13 @@ amap<- function(FUN, ..., MoreArgs=NULL, SIMPLIFY=TRUE, VECTORIZED=NA) {
 		d[n]
 	}, integer(l)), l, length(dots), dimnames=list(n, names(dots)))
 	#TODO: May be feature of moving tail is good, need reviving.
+	# @param SAFE 
+	# FALSE - use unsafe but fast implementation, all inputs are repeated as
+	# few as possible, assuming that `FUN` recycles short vectors
+	# (like basic operators "+"). 
+	# TRUE - slower, all inputs are organized properly to have the same
+	# dimension and passed to FUN.  For VECTORIZED=FALSE, SAFE is neglected
+	# because `.mapply` recycle short vectors.
 	#if (1L<l) ddat <-	# margin len 1 moved to tail
 	#	ddat[sort(rowSums(1==ddat), index.return=TRUE)$ix,,drop=FALSE]
 	#n <- rownames(ddat)
@@ -994,10 +1002,10 @@ amap<- function(FUN, ..., MoreArgs=NULL, SIMPLIFY=TRUE, VECTORIZED=NA) {
 }
 
 #' @rdname amap
-Ops.garray <- function(x,y) {	# Not include %*%
+Ops.garray <- function(e1, e2) {	# Not include %*%
 	FUN <- get(.Generic, envir=parent.frame(), mode="function")
-	if (1L==nargs()) amap(FUN, x, VECTORIZED=TRUE)
-		else amap(FUN, x, y, VECTORIZED=TRUE)
+	if (1L==nargs()) amap(FUN, e1, VECTORIZED=TRUE)
+		else amap(FUN, e1, e2, VECTORIZED=TRUE)
 }
 
 
@@ -1008,6 +1016,7 @@ Ops.garray <- function(x,y) {	# Not include %*%
 #' @param MARGIN  Some margins of X and names of sdim.
 #'	MARGIN=character() means to reduce all margins (over no margin).
 #'	In such case, areduce() is not needed actually.
+#' @param ...  Further arguments to 'FUN', no matching of margins.
 #' @param SIMPLIFY  TRUE - simplifies the result list to vector of atomic
 #'	if possible, and triggers warning and not simplifies if impossible;
 #'	FALSE - not simplifies for non speed-up function, and issues warning
@@ -1020,7 +1029,7 @@ Ops.garray <- function(x,y) {	# Not include %*%
 #' @return A matrix (similar to return of apply() or tapply()), with the
 #'	trailing margins the same as MARGIN, while the leading margins
 #'	depend on FUN and SIMPLIFY.  If FUN returns a scalar or SIMPLIFY=FALSE,
-#'	then no leading margins.  In MARGIN, subdim is replaced with superdims.
+#'	then no leading margins.  In MARGIN, subdimension is replaced with superdims.
 #' @examples
 #' a <- garray(matrix(1:24, 4, 6, dimnames=list(X=LETTERS[1:4], 
 #' 	Y=letters[1:6])), sdim=list(XX=c(x1=3,x2=1), YY=c(y1=1,y2=2)))
@@ -1135,7 +1144,7 @@ areduce <- function(FUN, X, MARGIN, ..., SIMPLIFY=TRUE, SAFE=FALSE) {
 			extent <- extent*length(reptimes)
 		}
 		sd0 <- sd[MARGIN[sdMARGIN]]
-		sd[MARGIN[sdMARGIN]] <- NULL	# subdim going to be reduced
+		sd[MARGIN[sdMARGIN]] <- NULL	# subdimension going to be reduced
 		if (extent>.Machine$integer.max) stop(sprintf(
 			"total number of levels > %d", .Machine$integer.max))
 		MARGIN[sdMARGIN] <- n0
@@ -1204,13 +1213,19 @@ areduce <- function(FUN, X, MARGIN, ..., SIMPLIFY=TRUE, SAFE=FALSE) {
 }
 
 
-#' Generalized sweep() for data cleaning.
+#' Generalized array's sweep() for data cleaning.
 #'
+#' Return a generalized array, by wiping out a summary statistic.
+#'
+#' @param X  A generalized array.
+#' @param FUN  The wiping function.
 #' @param STATS  Numeric array or function.
 #' @param MARGIN  NULL - STATS is an array; character - STATS is a function,
 #'	and by X being reduced along MARGIN, X is wiped.  Length 0 character
 #'	vector means reducing along no margin, resulting in a scalar (in
 #'	this case, for example, `areduce(sum, X)` is the same as `sum(X)`.
+#' @param MoreArgs,SIMPLIFY,VECTORIZED  Argument used by 'amap()'.
+#' @param ...  Argument used by 'areduce()'.
 #' @examples
 #' a <- garray(1:24, c(4,6), list(X=LETTERS[1:4], Y=letters[1:6]),
 #' 	sdim=list(XX=c(x1=3,x2=1), YY=c(y1=1,y2=2)))
@@ -1234,7 +1249,13 @@ awipe <- function(X, FUN="-", STATS="mean", MARGIN=NULL,
 #'	but excluded from reducing (parallel product like `*`);
 #'	other margins are extended repeatly (outer product like `%o%`).
 #'	Shared margins not to be mapped have to be renamed (like outer product).
+#'	For special FUN and SUM, fast algorithms are implemented.
+#' @param X,Y  Generalized arrays that can be multiplied.
+#' @param FUN  The 'multiply' function.
+#' @param SUM  The 'reduce' function.
 #' @param BY  margins excluded from summary by SUM.
+#' @param MoreArgs,SIMPLIFY,VECTORIZED  Argument used by 'amap()'.
+#' @param ...  Argument used by 'areduce()'.
 #' @examples
 #' a <- garray(1:24, c(4,6), list(X=LETTERS[1:4], Y=letters[1:6]),
 #' 	sdim=list(XX=c(x1=3,x2=1), YY=c(y1=1,y2=2)))
@@ -1299,7 +1320,9 @@ amult <- function(X, Y, FUN="*", SUM="sum", BY=NULL,
 }
 
 #' @rdname amult
-`%X%` <- amult	# %*% is S4 generic but not S3 generic
+`%X%` <- function(X, Y) amult(X, Y)
+# %*% cannot be used since it is S4 generic but not S3 generic.
+# Cannot simply do `%X%` <- amult, see r-base-3.5.1/src/library/base/outer.R
 
 #' Function composition operator
 #'
@@ -1314,7 +1337,7 @@ amult <- function(X, Y, FUN="*", SUM="sum", BY=NULL,
 #' @examples
 #'	lse <- log%+%sum%+%exp
 #'	lse(1:10)
-#'	logsumexp(1:10)	# actual logsumexp() is more sophistic
+#'	#logsumexp(1:10)	# actual logsumexp() is more sophistic
 #'	log(sum(exp(1:10)))
 #'	sum <- sd
 #'	lse(1:10)	# lse() is fixed at definition
