@@ -23,7 +23,8 @@
 #
 #' In addition, for a jagged (ragged) array R can
 #'
-#'	1. have a list, and each sublist is the members of a group, which is
+#'	1. (like the so called Iliffe vector) have a list,
+#'	and each sublist is the members of a group, which is
 #'	unconvinient (most math function not accepts list) but most flexible,
 #'	running with lapply() (also ref. package:rowr);
 #'	2. have a vector (values) recording all members and another (index)
