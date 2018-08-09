@@ -1,0 +1,2 @@
+export("%X%", "%+%")
+exportPattern("^[[:alpha:]]+")
