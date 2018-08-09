@@ -2,6 +2,7 @@ GIT
 ========
 
 ## Work flow
+#upload id_rsa.pub to github.com/huangqqss
 cd /var/tmp
 git clone git@github.com:/huangqqss/garray	# Clone via SSH to ./garray
 cd /var/tmp/garray
