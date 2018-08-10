@@ -290,6 +290,14 @@ remargins <- function(x, value) {
 #' Indexing for the garray class
 #'
 #' Indexing along margins as usual `[.array`, and along subdim.
+#'
+#' @usage
+#'	x[i]
+#'	x[i,j,...,drop=TRUE]
+#'	x[matrix]
+#'	x[list]
+#'	x[n1=i,n2=j,...]
+#'	x[]
 #' @param ...  In addition to the native styles accepted by `[`, can be
 #'	1.1 - a matrix with column names,
 #'	    the colnames(.) should be a permutation of margins of the array.
@@ -376,6 +384,13 @@ remargins <- function(x, value) {
 	Z
 }
 
+#' @usage
+#'	x[i] <- value
+#'	x[i,j,...,drop=TRUE] <- value
+#'	x[matrix] <- value
+#'	x[list] <- value
+#'	x[NAME1=i,NAME2=j,...] <- value
+#'	x[] <- value
 #' @rdname sub-.garray
 `[<-.garray` <- function(..., value) {
 	cl <- oldClass(..1)

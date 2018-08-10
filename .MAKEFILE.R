@@ -13,6 +13,7 @@ setwd("~/Desktop/garray")
 # Coding (with roxygen2)
 #package.skeleton("garray", code_files="main.R")
 # Write garray/DESCRIPTION file.
+library(devtools)
 document()
 run_examples()
 check()
