@@ -83,7 +83,6 @@
 #	* R's native `dim<-` should always go before `dimnames<-`. 
 #	  Whenever `dim<-` is called, attribute `dimnames` gets removed.
 #	  `dim.garray<-` tries to save dimnames as many as possible.
-
 #' @keywords internal
 "_PACKAGE"
 #> [1] "_PACKAGE"

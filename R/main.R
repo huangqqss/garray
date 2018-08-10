@@ -56,6 +56,7 @@ options(error=recover)
 #'	and '?sdim'.
 #' @param x  An R object.
 #' @param ...  Additional arguments to be passed to or from methods.
+#' @aliases garray
 #' @examples
 #'	a1 <- garray(1:27, c(A=3,B=9), sdim=list(A1=c(a=2,b=1),B1=c(a=3)))
 #'	a2 <- garray(1:27, c(A=3,B=9), sdim=list(A1=c(a=2,b=1),B1=c(a=4)))
@@ -294,19 +295,22 @@ remargins <- function(x, value) {
 #' @usage
 #'	x[i]
 #'	x[i,j,...,drop=TRUE]
-#'	x[matrix]
-#'	x[list]
-#'	x[n1=i,n2=j,...]
+#'	x[m]
+#'	x[l]
+#'	x[M=i,N=j,...]
 #'	x[]
-#' @param ...  In addition to the native styles accepted by `[`, can be
-#'	1.1 - a matrix with column names,
+#' @param x  A generalized array from which elements are extracted or replaced.
+#' @param i,j,m,l,M,N  In addition to the native styles (`i`, `j`, etc.)
+#'	accepted by `[`, can be:
+#'	1.1 - a matrix `m` with column names,
 #'	    the colnames(.) should be a permutation of margins of the array.
 #	    #TODO: a missing margin means select all along that margin
 #	#TODO: 1.2 - the colnames(.) can be from names of sdim, the return
 #	#	will be a list of arrays.
-#'	2.0 - an unnamed list, where NULL means to select all.
-#'	2.1 - a named list, where NULL means to select all;
-#'	3.1 - arguments with names, where NULL and missing means to select all;
+#'	2.0 - an unnamed list `l`, where NULL means to select all.
+#'	2.1 - a named list `l`, where NULL means to select all;
+#'	3.1 - arguments with names (`M`, `N`, etc), where `NULL` and missing
+#'		means to select all.
 #'	These extensions make indexing 3 times slower than native indexing.
 #'	Since it is hard to assign MissingArg in list(), at the moment
 #'	MissingArg is only safe in native R subsettting style.
@@ -387,9 +391,9 @@ remargins <- function(x, value) {
 #' @usage
 #'	x[i] <- value
 #'	x[i,j,...,drop=TRUE] <- value
-#'	x[matrix] <- value
-#'	x[list] <- value
-#'	x[NAME1=i,NAME2=j,...] <- value
+#'	x[m] <- value
+#'	x[l] <- value
+#'	x[M=i,N=j,...] <- value
 #'	x[] <- value
 #' @rdname sub-.garray
 `[<-.garray` <- function(..., value) {
@@ -1187,10 +1191,13 @@ areduce <- function(FUN, X, MARGIN, ..., SIMPLIFY=TRUE, SAFE=FALSE) {
 			"total number of levels > %d", .Machine$integer.max))
 		MARGIN[sdMARGIN] <- n0
 		if (identical("sum", FUN)) {	# Speed-up (10 times faster)
-			ugroup <- seq_len(extent)
-			Z <- .Internal(rowsum_matrix(X,
-				rep.int(group, prod(d[n1])), ugroup,
-				na.rm, as.character(ugroup)))
+			#ugroup <- seq_len(extent)
+			#Z <- .Internal(rowsum_matrix(X,
+			#	rep.int(group, prod(d[n1])), ugroup,
+			#	na.rm, as.character(ugroup)))
+			Z <- rowsum.default(X,
+				rep.int(group, prod(d[n1])), reorder=FALSE,
+				na.rm=na.rm)
 			# group should be integer; if double, result in 0.
 			if (isTRUE(!SIMPLIFY))
 				warning("alwayls return an array for sum")
