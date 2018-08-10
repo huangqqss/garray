@@ -603,9 +603,12 @@ aperm.garray <- function(a, perm=NULL, ...) {
 
 #' Combine generalized arrays
 #'
-#' Combine sdim correctly.
+#' Combine generalized arrays, similar to the manner cbind and rbind work. 
+#'	Put a sequence of generalized arrays and get a single generalized array
+#'	of the same or one more margins.
 #'
-#' Saving or dropping of subdimensions follow a few rules: subdimensions of
+#' Combine sdim correctly.
+#'	Saving or dropping of subdimensions follow a few rules: subdimensions of
 #'	the margin with bound along are dropped; of the other margins are save
 #'	unless the names of subdimensions are the same; subdimensions of the
 #'	same names are dropped except the first one.

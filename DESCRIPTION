@@ -1,9 +1,8 @@
 Package: garray
 Type: Package
-Title: Generalized array arithmetic for ragged arrays with named margins
-Version: 1.0
-Date: 2018-08-01
-Author@R: c(person("Qingsheng", "Huang", role=c("aut", "cre"))
+Title: Generalized Array Arithmetic for Ragged Arrays with Named Margins
+Version: 1.0.1
+Date: 2018-08-10
 Author: Qingsheng Huang
 Maintainer: Qingsheng Huang <huangqqss@126.com>
 Depends:
