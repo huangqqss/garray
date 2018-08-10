@@ -1,4 +1,4 @@
-#options(error=recover)
+options(error=recover)
 
 #' Generalized and smart array
 #'
@@ -589,29 +589,48 @@ aperm.garray <- function(a, perm=NULL, ...) {
 #' Combine generalized arrays
 #'
 #' Combine sdim correctly.
+#'
+#' Saving or dropping of subdimensions follow a few rules: subdimensions of
+#'	the margin with bound along are dropped; of the other margins are save
+#'	unless the names of subdimensions are the same; subdimensions of the
+#'	same names are dropped except the first one.
 #' @param ...  arrays, or a list of several arrays.  Margins of
 #'	these arrays should be the same.
 #' @param along  The dimension along which to bind the arrays. 
 #'	The arrays may have different lengths along that dimension,
-#'	and are bind along it, with addition `sdim` indicating the composition
-#'	of this dimension (creating a new subdimension).  Some arrays may not have
-#'	that margin, then the dimension of these arrays expand to 1.
-#'	If assign a new margin is created,
-#'	and will become last dimensions of output.
-#'	In such case, all arrays should have the same dimension lengths.
-#' @param margins  Resulting margins.  If includes a new margin, then
+#'	and are bind along it, with addition subdimension '*.bind.from'
+#'	indicating the composition
+#'	of the `along` dimension.  Some arrays may not
+#'	have that margin, then the dimension of these arrays expand to 1.
+#'	If `along` is a totally new margin, it is created.
+#'	In such case, all arrays should have the same dimension.
+#' @param margins  Resulting margins.  If includes a totally new margin (not
+#'	used by any arrays in `...`), then
 #'	`along` is neglected and the new margin setting `along`.
-#'	If no new name, along the last `margins`.
-abind <- function(..., margins=NULL, along=character()) {
+#'	If no new name and `length(along)==0L`, the last `margins` become along.
+#'	If `0L==length(margins)`, `along` will become last dimensions of output.
+#' @examples
+#'	a <- garray(1:24, c(4,6),
+#'		dimnames=list(X=1:4, Y=letters[1:6]),
+#'	 	sdim=list(XX=c(x1=3,x2=1), YY=c(y1=1,y2=2)))
+#'	b <- garray(1:6/10,6,dimnames=list(Y=letters[1:6]))
+#'	ab <- abind(a=a, b=b, along="X")
+#'	#abind(a, b, margins=c("X","Y"))	# Error
+#'	ab2 <- abind(a=a, b=b, margins=c("X","Y"), along="X")
+#'	aa <- abind(a=a, a=a, along="Z")
+#'	ab3 <- abind(a, b, along="X")
+abind <- function(..., margins=character(), along=character()) {
 	dots <- list(...)
 	if (0L==length(dots)) return(NULL)
 		else if (1L==length(dots) && is.list(dots[[1]]))
 		dots <- dots[[1]]
 	if (!all(vapply(dots, is.garray, TRUE))) stop("need one list of arrays")
-	if (is.null(margins)) margins <- unique(c(margins(dots[[1]]), along))
+	if (0L==length(margins))
+		margins <- unique(c(do.call("c", lapply(dots, margins)), along))
 	new <- !margins%in%margins(dots[[1]])
 	stopifnot(2>sum(new))
-	along <- if (0L==sum(new))  margins[length(margins)]
+	if (0L==length(along)) along <-
+		if (0L==sum(new))  margins[length(margins)]
 		else if (1L==sum(new)) margins[new]
 		else stop("too many new margins")
 	n <- c(margins[margins!=along], along)
@@ -624,6 +643,7 @@ abind <- function(..., margins=NULL, along=character()) {
 	sd <- list()
 	newsd <- integer()
 	nam <- make.names(names(dots), unique=TRUE)
+	if (0L==length(nam)) nam <- make.unique(rep(along, length(dots)))
 	for (i in seq_along(dots)) {
 		new <- !n%in%margins(dots[[i]])
 		di <- dim(dots[[i]])
@@ -639,18 +659,18 @@ abind <- function(..., margins=NULL, along=character()) {
 			stop("too many dimensions not match")
 		d[along] <- d[along]+dim(dots[[i]])[along]
 		newsd[nam[i]] <- d[along]
-		dn[[along]] <- c(dn[[along]], paste0(nam[i],
-			dimnames(dots[[i]])[[along]]))
+		dn[[along]] <- c(dn[[along]], paste(nam[i],
+			dimnames(dots[[i]])[[along]], sep="."))
 		sdi <- sdim(dots[[i]])
 		for (k in names(sdi)) {
-			if (along==k) warning(sprintf(
-				"sdim named `%s` may be overrided", k))
+			if (startsWith(k, along)) next
+			#warning(sprintf("sdim named `%s` is overridden", k))
 			if (is.null(sd[[k]])) sd[[k]] <- sdi[[k]]
 			else if (!identical(sd[[k]], sdi[[k]])) warning(sprintf(
 				"discard divergence sdim %s for %d", k, i))
 		}
 	}	# used to be based on lapply(), but `<<-` is tricky.
-	if (any(nam!=1)) sd[[along]] <- newsd	# User may rename it afterward
+	sd[[paste0(along, ".bind.from")]] <- diff(c(0, newsd))
 	aperm(garray(do.call("c", dots), d, dn, margins=n, sdim=sd), margins)
 }
 
