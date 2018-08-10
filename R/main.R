@@ -298,9 +298,9 @@ remargins <- function(x, value) {
 #'	x[m]
 #'	x[l]
 #'	x[M=i,N=j,...]
-#'	x[]
+#'	[.garray(x, ...)
 #' @param x  A generalized array from which elements are extracted or replaced.
-#' @param i,j,m,l,M,N  In addition to the native styles (`i`, `j`, etc.)
+#' @param i,j,m,l,M,N,...  In addition to the native styles (`i`, `j`, etc.)
 #'	accepted by `[`, can be:
 #'	1.1 - a matrix `m` with column names,
 #'	    the colnames(.) should be a permutation of margins of the array.
@@ -322,6 +322,7 @@ remargins <- function(x, value) {
 #' @param drop  Whether indeces where 1==dim are removed.  Different from
 #'	R's native `[`, a garray will become a garray or scalar, never a vector.
 #' @param value  An array or a scalar.
+#' @aliases [ [<-
 #' @examples
 #'	mm <- matrix(c(1:3,1), 2, 2, dimnames=list(NULL, c("B","A")))
 #'	a <- garray(1:27, c(A=3,B=9), sdim=list(A1=c(a=2,b=1),B1=c(a=3)))
@@ -390,11 +391,11 @@ remargins <- function(x, value) {
 
 #' @usage
 #'	x[i] <- value
-#'	x[i,j,...,drop=TRUE] <- value
+#'	x[i,j,...] <- value
 #'	x[m] <- value
 #'	x[l] <- value
 #'	x[M=i,N=j,...] <- value
-#'	x[] <- value
+#'	[.garray(x, value)
 #' @rdname sub-.garray
 `[<-.garray` <- function(..., value) {
 	cl <- oldClass(..1)

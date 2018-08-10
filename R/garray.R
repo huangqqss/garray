@@ -84,5 +84,8 @@
 #	  Whenever `dim<-` is called, attribute `dimnames` gets removed.
 #	  `dim.garray<-` tries to save dimnames as many as possible.
 #' @keywords internal
+#' @aliases garray-package
+# If remove @aliases here, roxygen2 will generate '@aliases garray'
+#	which conflicts with the help file of function garray().
 "_PACKAGE"
 #> [1] "_PACKAGE"
