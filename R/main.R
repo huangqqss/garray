@@ -292,13 +292,16 @@ remargins <- function(x, value) {
 #'
 #' Indexing along margins as usual `[.array`, and along subdim.
 #'
+# @name [.garray
+# @aliases [ [<-
 #' @usage
-#'	x[i]
-#'	x[i,j,...,drop=TRUE]
-#'	x[m]
-#'	x[l]
-#'	x[M=i,N=j,...]
-#'	[.garray(x, ...)
+#'	\\method{[}{garray}(..., drop=TRUE)
+#'	#x[i]
+#'	#x[i,j,...,drop=TRUE]
+#'	#x[m]
+#'	#x[l]
+#'	#x[M=i,N=j,...]
+#FIXME: uncommenting the above usage results in Warning by devtools::check()
 #' @param x  A generalized array from which elements are extracted or replaced.
 #' @param i,j,m,l,M,N,...  In addition to the native styles (`i`, `j`, etc.)
 #'	accepted by `[`, can be:
@@ -390,12 +393,12 @@ remargins <- function(x, value) {
 }
 
 #' @usage
-#'	x[i] <- value
-#'	x[i,j,...] <- value
-#'	x[m] <- value
-#'	x[l] <- value
-#'	x[M=i,N=j,...] <- value
-#'	[.garray(x, value)
+#'	\\method{[}{garray}(...) <- value
+#'	#x[i] <- value
+#'	#x[i,j,...] <- value
+#'	#x[m] <- value
+#'	#x[l] <- value
+#'	#x[M=i,N=j,...] <- value
 #' @rdname sub-.garray
 `[<-.garray` <- function(..., value) {
 	cl <- oldClass(..1)
