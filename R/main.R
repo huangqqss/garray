@@ -56,7 +56,6 @@ options(error=recover)
 #'	and '?sdim'.
 #' @param x  An R object.
 #' @param ...  Additional arguments to be passed to or from methods.
-#' @aliases garray
 #' @examples
 #'	a1 <- garray(1:27, c(A=3,B=9), sdim=list(A1=c(a=2,b=1),B1=c(a=3)))
 #'	a2 <- garray(1:27, c(A=3,B=9), sdim=list(A1=c(a=2,b=1),B1=c(a=4)))
@@ -261,6 +260,7 @@ remargins <- function(x, value) {
 #' @param x  An generalized array.
 #' @param value  An integer (can be coerced from double numeric) vector, with
 #'	names.
+#' @aliases dim dim<-
 `dim.garray` <- function(x) {
 	d <- NextMethod("dim")
 	names(d) <- margins(x)	# names of dim() is kept by dimnames(). 
@@ -292,10 +292,10 @@ remargins <- function(x, value) {
 #'
 #' Indexing along margins as usual `[.array`, and along subdim.
 #'
-# @name [.garray
-# @aliases [ [<-
+#' @aliases [ [<- [.garray [<-.garray
 #' @usage
-#'	\\method{[}{garray}(..., drop=TRUE)
+#'	\method{[}{garray}(..., drop=TRUE)
+#'	#`[.garray`(..., drop=TRUE)
 #'	#x[i]
 #'	#x[i,j,...,drop=TRUE]
 #'	#x[m]
@@ -305,15 +305,16 @@ remargins <- function(x, value) {
 #' @param x  A generalized array from which elements are extracted or replaced.
 #' @param i,j,m,l,M,N,...  In addition to the native styles (`i`, `j`, etc.)
 #'	accepted by `[`, can be:
-#'	1.1 - a matrix `m` with column names,
-#'	    the colnames(.) should be a permutation of margins of the array.
+#'	1. a matrix `m` with column names,
+#'		which (`colnames(m)`) is a permutation of margins of the array.
 #	    #TODO: a missing margin means select all along that margin
 #	#TODO: 1.2 - the colnames(.) can be from names of sdim, the return
 #	#	will be a list of arrays.
-#'	2.0 - an unnamed list `l`, where NULL means to select all.
-#'	2.1 - a named list `l`, where NULL means to select all;
-#'	3.1 - arguments with names (`M`, `N`, etc), where `NULL` and missing
+#'	2. an list `l <- list(i,j,...)`, can be unnamed or named,
+#'		where NULL means to select all;
+#'	3. arguments with names (`M`, `N`, etc), where `NULL` and missing
 #'		means to select all.
+#'
 #'	These extensions make indexing 3 times slower than native indexing.
 #'	Since it is hard to assign MissingArg in list(), at the moment
 #'	MissingArg is only safe in native R subsettting style.
@@ -325,7 +326,6 @@ remargins <- function(x, value) {
 #' @param drop  Whether indeces where 1==dim are removed.  Different from
 #'	R's native `[`, a garray will become a garray or scalar, never a vector.
 #' @param value  An array or a scalar.
-#' @aliases [ [<-
 #' @examples
 #'	mm <- matrix(c(1:3,1), 2, 2, dimnames=list(NULL, c("B","A")))
 #'	a <- garray(1:27, c(A=3,B=9), sdim=list(A1=c(a=2,b=1),B1=c(a=3)))
@@ -393,7 +393,8 @@ remargins <- function(x, value) {
 }
 
 #' @usage
-#'	\\method{[}{garray}(...) <- value
+#'	#\method{[}{garray}(...) <- value
+#'	#`[<-.garray`(..., value)
 #'	#x[i] <- value
 #'	#x[i,j,...] <- value
 #'	#x[m] <- value
