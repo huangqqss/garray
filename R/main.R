@@ -10,22 +10,20 @@ if (is.null(getOption("mc.cores")) || 2L>getOption("mc.cores")) {
 	.LAPPLY <- function(X, FUN, ...) mclapply(X, FUN, ...)
 	.MAPPLY <- function(FUN, dots, MoreArgs=NULL) {
 		if (!length(dots)) return(list())
-		lens <- lengths(dots)
-		n <- max(lens)
-		if (n && min(lens)==0L) stop(
+		l <- lengths(dots)
+		n <- max(l)
+		if (n && min(l)==0L) stop(
 			"Zero-length inputs mixed with non-zero length")
-		if (n < 2L) {
+		if (n<2L) {
 			.mapply(FUN, dots, MoreArgs)
 		} else {
-			if (any(lens!=n)) dots <-
-				lapply(dots, function(x) rep(x, length.out=n))
-			f <- function(idx) {
-			    .mapply(FUN, lapply(dots, function(x) x[idx]),
-				    MoreArgs)
-			}
+			if (any(l!=n)) dots <- lapply(dots,
+				function(x) rep(x, length.out=n))
+			f <- function(idx) .mapply(FUN, lapply(dots,
+				function(x) x[idx]), MoreArgs)
 			do.call(c, mclapply(seq_len(n), f))
 		}
-	}
+	}	# Simplified from parallel::mcmapply()
 }	# Use `.LAPPLY <- lapply` introduce .Internal().
 
 
