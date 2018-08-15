@@ -1,5 +1,6 @@
 export("%X%", "%+%")
 exportPattern("^[[:alpha:]]+")
+import("parallel")
 S3method("as.garray", "garray")
 S3method("as.garray", "default")
 S3method(as.data.frame, "garray")

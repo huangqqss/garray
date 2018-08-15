@@ -1,5 +1,34 @@
 options(error=recover)
 
+if (is.null(getOption("mc.cores")) || 2L>getOption("mc.cores")) {
+	cat("Running without parallel\n")
+	.LAPPLY <- function(X, FUN, ...) lapply(X, FUN, ...)
+	.MAPPLY <- function(FUN, dots, MoreArgs=NULL)
+		.mapply(FUN, dots, MoreArgs)
+} else {
+	cat('Running with parallel, check options("mc.cores")\n')
+	.LAPPLY <- function(X, FUN, ...) mclapply(X, FUN, ...)
+	.MAPPLY <- function(FUN, dots, MoreArgs=NULL) {
+		if (!length(dots)) return(list())
+		lens <- lengths(dots)
+		n <- max(lens)
+		if (n && min(lens)==0L) stop(
+			"Zero-length inputs mixed with non-zero length")
+		if (n < 2L) {
+			.mapply(FUN, dots, MoreArgs)
+		} else {
+			if (any(lens!=n)) dots <-
+				lapply(dots, function(x) rep(x, length.out=n))
+			f <- function(idx) {
+			    .mapply(FUN, lapply(dots, function(x) x[idx]),
+				    MoreArgs)
+			}
+			do.call(c, mclapply(seq_len(n), f))
+		}
+	}
+}	# Use `.LAPPLY <- lapply` introduce .Internal().
+
+
 #' Generalized and smart array
 #'
 #' Creates or tests for generalized arrays.
@@ -1035,7 +1064,7 @@ amap<- function(FUN, ..., MoreArgs=NULL, SIMPLIFY=TRUE, VECTORIZED=NA) {
 			warning("alwayls return an array for vectorized fun")
 		dimnames(X) <- dn
 	} else {
-		X <- .mapply(FUN, dots, MoreArgs)
+		X <- .MAPPLY(FUN, dots, MoreArgs)
 		dim(X) <- d
 		if (isTRUE(SIMPLIFY)) X <- .simplify2array(X)
 		last <- length(dim(X))
@@ -1078,24 +1107,33 @@ Ops.garray <- function(e1, e2) {	# Not include %*%
 #'	depend on FUN and SIMPLIFY.  If FUN returns a scalar or SIMPLIFY=FALSE,
 #'	then no leading margins.  In MARGIN, subdimension is replaced with superdims.
 #' @examples
-#' a <- garray(matrix(1:24, 4, 6, dimnames=list(X=LETTERS[1:4], 
-#' 	Y=letters[1:6])), sdim=list(XX=c(x1=3,x2=1), YY=c(y1=1,y2=2)))
-#' m1 <- areduce("sum", a, c("X"))
-#' m2 <- areduce(`sum`, a, c("X"))
-#' p1 <- areduce("sum", a, c("YY"))
-#' p2 <- areduce(`sum`, a, c("YY"))
-#' q1 <- areduce("sum", a, c("X","YY"))
-#' q2 <- areduce(`sum`, a, c("X","YY"))
-#' r1 <- areduce("sum", a, c("XX","YY"))
-#' r2 <- areduce(`sum`, a, c("XX","YY"))
-#' b <- garray(1:24, c(3,4,2), dimnames=list(X=LETTERS[1:3], 
-#'      Y=letters[1:4],Z=NULL), sdim=list(XX=c(x1=2,x2=1), YY=c(y1=1,y2=1)))
-#' s1 <- areduce("sum", b, c("XX","YY","Z"))
-#' s2 <- areduce(`sum`, b, c("XX","YY","Z"))
-#' t1 <- areduce(`identity`, b, c("XX","YY","Z"), SIMPLIFY=FALSE)
-#' t2 <- areduce("c", b, c("XX","YY","Z"), SIMPLIFY=FALSE)	# not `c`
-#' t3 <- areduce(`identity`, b, c("XX","YY"), SIMPLIFY=FALSE, SAFE=TRUE)
-#' t4 <- areduce(`identity`, b, c("XX","YY"), SIMPLIFY=FALSE, SAFE=FALSE)
+#'	a <- garray(1:24, c(4,6),
+#'		dimnames=list(X=LETTERS[1:4], Y=letters[1:6]),
+#'		sdim=list(XX=c(x1=3,x2=1), YY=c(y1=1,y2=2)))
+#'	x1 <- areduce("sum", a, c("X"))
+#'	x2 <- areduce(`sum`, a, c("X"))
+#'	stopifnot(garray(c(66,72,78,84), margins="X")==x1, x2==x1)
+#'	yy1 <- areduce("sum", a, c("YY"))
+#'	yy2 <- areduce(`sum`, a, c("YY"))
+#'	stopifnot(garray(c(10,68,58,164), margins="Y")==yy1, yy2==yy1)
+#'	xyy1 <- areduce("sum", a, c("X","YY"))
+#'	xyy2 <- areduce(`sum`, a, c("X","YY"))
+#'	stopifnot(xyy1==xyy2)
+#'	xxyy1 <- areduce("sum", a, c("XX","YY"))
+#'	xxyy2 <- areduce(`sum`, a, c("XX","YY"))
+#'	stopifnot(garray(c(6,4,48,20,42,16,120,44), c(X=2,Y=4))==xxyy1)
+#'	stopifnot(xxyy2==xxyy1)
+#'	b <- garray(1:24, c(3,4,2),
+#'		dimnames=list(X=LETTERS[1:3], Y=letters[1:4], Z=NULL),
+#'		sdim=list(XX=c(x1=2,x2=1), YY=c(y1=1,y2=1)))
+#'	xxyyz1 <- areduce("sum", b, c("XX","YY","Z"))
+#'	xxyyz2 <- areduce(`sum`, b, c("XX","YY","Z"))
+#'	stopifnot(xxyyz1==xxyyz2)
+#'	xyz1 <- areduce(identity, b, c("XX","YY","Z"), SIMPLIFY=FALSE)
+#'	xyz2 <- areduce("c",      b, c("XX","YY","Z"), SIMPLIFY=FALSE)
+#'	xy1 <- areduce(identity, b, c("XX","YY"), SIMPLIFY=FALSE, SAFE=TRUE)
+#'	stopifnot(identical(dimnames(xy1[2,3][[1]]), list(X="C",Y="c",Z=NULL)))
+#'	# garray of lists, cannot use `xyz1==xyz2` etc to compare.
 areduce <- function(FUN, X, MARGIN, ..., SIMPLIFY=TRUE, SAFE=FALSE) {
 	stopifnot(is.garray(X), is.character(MARGIN))
 	n <- margins(X)
@@ -1105,7 +1143,6 @@ areduce <- function(FUN, X, MARGIN, ..., SIMPLIFY=TRUE, SAFE=FALSE) {
 	na.rm <- ifelse(is.null(list(...)$na.rm), FALSE, list(...)$na.rm)
 	if (all(MARGIN%in%n)) {
 		n1 <- n[!n%in%MARGIN]
-		dn1 <- dn[n1]
 		X <- aperm(X, perm=c(n1, MARGIN))
 		d1 <- prod(d[n1])
 		d2 <- prod(d[MARGIN])	# prod(NULL)==1
@@ -1127,18 +1164,13 @@ areduce <- function(FUN, X, MARGIN, ..., SIMPLIFY=TRUE, SAFE=FALSE) {
 			class(X) <- NULL
 			dim(X) <- c(d1, d2)
 			FUN <- match.fun(FUN)
-			Z <- vector("list", d2)
 			if (SAFE) {
-				for (i in seq_along(Z)) {
-					Z[[i]] <- forceAndCall(1, FUN,
-						garray(X[,i], d[n1],
-						dn1, sdim=sd), ...)
-				}	# apply() internally use this loop
+				Z <- .LAPPLY(seq_len(d2), function(i)
+					forceAndCall(1, FUN, garray(X[,i],
+						d[n1], dn[n1], sdim=sd), ...))
 			} else {
-				for (i in seq_along(Z)) {
-					Z[[i]] <- forceAndCall(1, FUN,
-						X[,i], ...)
-				}
+				Z <- .LAPPLY(seq_len(d2), function(i)
+					forceAndCall(1, FUN, X[,i], ...))
 			}
 			if (isTRUE(SIMPLIFY)) Z <- .simplify2array(Z)
 			last <- length(dim(Z))
@@ -1211,7 +1243,6 @@ areduce <- function(FUN, X, MARGIN, ..., SIMPLIFY=TRUE, SAFE=FALSE) {
 			Z <- aperm(Z, MARGIN)
 		} else {
 			# Implementations UNLIST(Z) - Faster
-			Z <- vector("list", d2)
 			if (SAFE) {
 				nn <- spd[names(sd0)]
 				names(sd0) <- nn
@@ -1222,7 +1253,7 @@ areduce <- function(FUN, X, MARGIN, ..., SIMPLIFY=TRUE, SAFE=FALSE) {
 					offset <- cumsum(reptimes)-reptimes
 					dn[seq_len(reptimes[i])+offset[i]]
 				}
-				f <- function(i, ...) {
+				f <- function(i, XX, ...) {
 					idx <- (i-1L)%%extent1%/%extent2+1L
 					n[n2] <- NULL
 					FUN(aperm(garray(XX[[i]], c(.mapply(
@@ -1232,15 +1263,13 @@ areduce <- function(FUN, X, MARGIN, ..., SIMPLIFY=TRUE, SAFE=FALSE) {
 						NULL), dn[n1]),
 						c(nn, n1), sdim=sd), n), ...)
 				}
-				for (i in seq_len(d2)) {
-					XX <- split(X, group)
-					Z[[i]] <- lapply(seq_along(XX), f, ...)
-				}
+				Z <- .LAPPLY(seq_len(d2), function(i) {
+					XX <- split(X[,i], group)
+					.LAPPLY(seq_along(XX), f, XX, ...)
+				})
 			} else {
-				for (i in seq_len(d2)) {
-					Z[[i]] <- lapply(split(X[,i], group),
-						FUN, ...)
-				}
+				Z <- .LAPPLY(seq_len(d2), function(i)
+					.LAPPLY(split(X[,i], group), FUN, ...))
 			}
 			Z <- do.call("c", Z)
 			# Implementations REP(GROUP) - Slower
