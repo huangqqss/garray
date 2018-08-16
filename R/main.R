@@ -84,8 +84,8 @@ if (is.null(getOption("mc.cores")) || 2L>getOption("mc.cores")) {
 #' @param x  An R object.
 #' @param ...  Additional arguments to be passed to or from methods.
 #' @examples
-#'	a1 <- garray(1:27, c(A=3,B=9), sdim=list(A1=c(a=2,b=1),B1=c(a=3)))
-#'	a2 <- garray(1:27, c(A=3,B=9), sdim=list(A1=c(a=2,b=1),B1=c(a=4)))
+#'	a1 <- garray(1:27, c(A=3,B=9), sdim=list(AA=c(a=2,b=1),BB=c(a=3)))
+#'	a2 <- garray(1:27, c(A=3,B=9), sdim=list(AA=c(a=2,b=1),BB=c(a=4)))
 garray <- function(data, dim=NULL, dimnames=NULL,
 		margins=NULL, sdim=attr(data, "sdim", exact=TRUE)) {
 	if (is.null(dim)) {
@@ -355,7 +355,7 @@ remargins <- function(x, value) {
 #' @param value  An array or a scalar.
 #' @examples
 #'	mm <- matrix(c(1:3,1), 2, 2, dimnames=list(NULL, c("B","A")))
-#'	a <- garray(1:27, c(A=3,B=9), sdim=list(A1=c(a=2,b=1),B1=c(a=3)))
+#'	a <- garray(1:27, c(A=3,B=9), sdim=list(AA=c(a=2,b=1),BB=c(a=3)))
 #'	b <- a[mm]
 #'	c1 <- a[B=1:2,A=NULL]
 #'	c2 <- a[B=1:2,A=]
@@ -371,14 +371,18 @@ remargins <- function(x, value) {
 #'	d6 <- a[,] ; d6[B=1:2,A=NULL] <- 1
 #'	d7 <- a[,] ; d7[mm] <- 1000
 #'	d8 <- a[,] ; d8[mm] <- 1:2*1000
-#'	e1 <- a[A1=1,drop=FALSE]
-#'	e2 <- a[A1="b",drop=FALSE]
-#'	e3 <- a[,] ; e3[A1="b"] <- e2*10
+#'	e1 <- a[AA=1,drop=FALSE]
+#'	e11 <- a[AA=c(1,1),drop=FALSE]
+#'	e2 <- a[AA="b",drop=FALSE]
+#'	ebb <- a[AA=c("b","b"),drop=FALSE]
+#'	e3 <- a[,] ; e3[AA="b"] <- e2*10
+#'	e33 <- a[,] ; e33[AA=c("b","b")] <- c(e2*0.1, e2*100)
+#'	# Work in the same manner of `e33[c(3,3),] <- c(e2*0.1, e2*100)`.
 #'	e4 <- a[A=c(TRUE,FALSE,FALSE),drop=FALSE]
 #'	e5 <- a[A=TRUE,drop=FALSE]
 #'	e6 <- a[B=c(TRUE,FALSE,FALSE),drop=FALSE]
-#'	e7 <- a[A1=TRUE,drop=FALSE]
-#'	e8 <- a[A1=c(TRUE,FALSE),drop=FALSE]
+#'	e7 <- a[AA=TRUE,drop=FALSE]
+#'	e8 <- a[AA=c(TRUE,FALSE),drop=FALSE]
 `[.garray` <- function(..., drop=TRUE) {
 	n <- margins(..1)
 	arg <- match.call()[-c(1:2)]	# fast sys.call() not work for `[`(...)
@@ -503,9 +507,11 @@ remargins <- function(x, value) {
 			offset <- cumsum(reptimes)-reptimes
 			i <- idx[[k]]
 			if (is.logical(i)) i <- seq_along(reptimes)[i]
-			if (!is.null(i)) l[[spd[k]]] <-
-				do.call("c", lapply(i,
-				function(j) seq_len(reptimes[j])+offset[j]))
+			l[[spd[k]]] <- if (1L<length(i))
+				do.call("c", lapply(i, function(j)
+					seq_len(reptimes[j])+offset[j]))
+				else if (1L==length(i))
+					seq_len(reptimes[i])+offset[i]
 		}
 	}
 	names(l) <- NULL
