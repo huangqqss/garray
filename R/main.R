@@ -3,11 +3,12 @@ options(error=recover)
 if (is.null(getOption("mc.cores")) || 2L>getOption("mc.cores")) {
 	cat("Running without parallel\n")
 	.LAPPLY <- function(X, FUN, ...) lapply(X, FUN, ...)
+	# Not simply `.LAPPLY <- lapply` since it introduces .Internal().
 	.MAPPLY <- function(FUN, dots, MoreArgs=NULL)
 		.mapply(FUN, dots, MoreArgs)
 } else {
 	cat('Running with parallel, check options("mc.cores")\n')
-	.LAPPLY <- function(X, FUN, ...) mclapply(X, FUN, ...)
+	.LAPPLY <- function(X, FUN, ...) parallel::mclapply(X, FUN, ...)
 	.MAPPLY <- function(FUN, dots, MoreArgs=NULL) {
 		if (!length(dots)) return(list())
 		l <- lengths(dots)
@@ -21,10 +22,10 @@ if (is.null(getOption("mc.cores")) || 2L>getOption("mc.cores")) {
 				function(x) rep(x, length.out=n))
 			f <- function(idx) .mapply(FUN, lapply(dots,
 				function(x) x[idx]), MoreArgs)
-			do.call(c, mclapply(seq_len(n), f))
+			do.call(c, parallel::mclapply(seq_len(n), f))
 		}
 	}	# Simplified from parallel::mcmapply()
-}	# Use `.LAPPLY <- lapply` introduce .Internal().
+}
 
 
 #' Generalized and smart array
