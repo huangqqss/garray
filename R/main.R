@@ -45,15 +45,17 @@ if (is.null(getOption("mc.cores")) || 2L>getOption("mc.cores")) {
 #'	lengths of subdivision groups within a dimension.  Every name of the
 #'	list prefixed with a margin of the generalized array. By the matching
 #'	of sdim names and dim names, utility functions figure out which
-#'	dimensions the sub dimensions reside in.  Summary of a vector of the
+#'	dimensions the sub dimensions reside in.  Sum of a vector of the
 #'	list usually equals to the extent of the corresponding dimension.
 #'	If they are not equal and the extent can not be divided exactly
-#'	by the summary, the subdimension is invalid and will be dropped.
+#'	by the sum, the subdimension is invalid and will be dropped.
 #'	If the extent can be divided exactly
-#'	by the summary, the subdimension is still valid but non-canonical.
+#'	by the sum, the subdimension is still valid but non-canonical.
 #'	Non-canonical subdimension can be provided to `garray()` and `sdim<-`
-#'	as argument, and the two functions can canonicalize it.
-#'	Other utility functions cannot handle non-canonical subdimension.
+#'	as argument, and the two functions canonicalize it.
+#'	Other utility functions cannot handle non-canonical subdimension,
+#'	thus manually constructing objects of garray class is permitted but
+#'	dangerous.
 #'	Values of each vector of the list denotes the
 #'	repeating times of subdimension residing in the coresponding dimension
 #'	(called superdim). 
