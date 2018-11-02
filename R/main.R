@@ -1,32 +1,5 @@
-options(error=recover)
-
-if (is.null(getOption("mc.cores")) || 2L>getOption("mc.cores")) {
-	cat("Running without parallel\n")
-	.LAPPLY <- function(X, FUN, ...) lapply(X, FUN, ...)
-	# Not simply `.LAPPLY <- lapply` since it introduces .Internal().
-	.MAPPLY <- function(FUN, dots, MoreArgs=NULL)
-		.mapply(FUN, dots, MoreArgs)
-} else {
-	cat('Running with parallel, check options("mc.cores")\n')
-	.LAPPLY <- function(X, FUN, ...) parallel::mclapply(X, FUN, ...)
-	.MAPPLY <- function(FUN, dots, MoreArgs=NULL) {
-		if (!length(dots)) return(list())
-		l <- lengths(dots)
-		n <- max(l)
-		if (n && min(l)==0L) stop(
-			"Zero-length inputs mixed with non-zero length")
-		if (n<2L) {
-			.mapply(FUN, dots, MoreArgs)
-		} else {
-			if (any(l!=n)) dots <- lapply(dots,
-				function(x) rep(x, length.out=n))
-			f <- function(idx) .mapply(FUN, lapply(dots,
-				function(x) x[idx]), MoreArgs)
-			do.call(c, parallel::mclapply(seq_len(n), f))
-		}
-	}	# Simplified from parallel::mcmapply()
-}
-
+#options(error=recover)
+#source("R/zzz.R")
 
 #' Generalized and smart array
 #'
@@ -989,6 +962,9 @@ read.ctable <- function(file, header, row.names, col.names, ..., storagemode="do
 #' n2 <- amap(sum,     c,a,b,e,    0.0001, VECTORIZED=FALSE)
 #' n3 <- amap(sum,     c,a,b,e,f,  0.0001, VECTORIZED=FALSE)
 #' p1 <- amap(sum,     c,a,b,e,f,g,0.0001, VECTORIZED=FALSE)
+#' q1 <- amap(sum, c,a,b,e,f,g,0.0001, SIMPLIFY=FALSE, VECTORIZED=FALSE)
+#' q2 <- amap(c,   c,a,b,e,f,g,0.0001, SIMPLIFY=FALSE, VECTORIZED=FALSE)
+#' q3 <- amap(list,c,a,b,e,f,g,0.0001, SIMPLIFY=FALSE, VECTORIZED=FALSE)
 #' m1==m2
 #' m2==m3
 #' m2==aperm(m3, 3:1)
@@ -1067,17 +1043,21 @@ amap<- function(FUN, ..., MoreArgs=NULL, SIMPLIFY=TRUE, VECTORIZED=NA) {
 	if (VECTORIZED) {
 		X <- do.call(FUN, c(dots, MoreArgs))
 		dim(X) <- d	#X <- aperm(., n)
-		if (isTRUE(!SIMPLIFY))
-			warning("alwayls return an array for vectorized fun")
 		dimnames(X) <- dn
+		if (isTRUE(!SIMPLIFY))
+			warning("always return an array for vectorized fun")
 	} else {
 		X <- .MAPPLY(FUN, dots, MoreArgs)
-		dim(X) <- d
-		if (isTRUE(SIMPLIFY)) X <- .simplify2array(X)
-		last <- length(dim(X))
-		dnX <- dimnames(X)
-		dim(X) <- c(dim(X)[-last], d)
-		dimnames(X) <- c(dnX[-last], dn)
+		if (isTRUE(SIMPLIFY)) {
+			X <- .simplify2array(X)
+			last <- length(dim(X))
+			dnX <- dimnames(X)
+			dim(X) <- c(dim(X)[-last], d)
+			dimnames(X) <- c(dnX[-last], dn)
+		} else {
+			dim(X) <- d
+			dimnames(X) <- dn
+		}
 	}
 	class(X) <- "garray"	# garray() is too expensive
 	sdim(X) <- sd
@@ -1162,7 +1142,7 @@ areduce <- function(FUN, X, MARGIN, ..., SIMPLIFY=TRUE, SAFE=FALSE) {
 				else	# need not set dim(X) <- c(nrow, ncol)
 				FUN(   X,  d1, d2, na.rm)
 			if (isTRUE(!SIMPLIFY)||isTRUE(SAFE)) warning(
-				"alwayls return an array for sum and mean")
+				"always return an array for sum and mean")
 			if (0L<length(MARGIN)) {
 				dim(Z) <- d[MARGIN]
 				dimnames(Z) <- dn[MARGIN]
@@ -1244,7 +1224,7 @@ areduce <- function(FUN, X, MARGIN, ..., SIMPLIFY=TRUE, SAFE=FALSE) {
 				na.rm=na.rm)
 			# group should be integer; if double, result in 0.
 			if (isTRUE(!SIMPLIFY))
-				warning("alwayls return an array for sum")
+				warning("always return an array for sum")
 			dim(Z) <- c(lengths(ngroup), d[n2])
 			dimnames(Z) <- c(ngroup, dn[n2])
 			Z <- aperm(Z, MARGIN)
