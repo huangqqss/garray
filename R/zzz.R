@@ -1,6 +1,6 @@
 # Serial definition, and they will be redefined for parallel in .onAttach()
 .LAPPLY <- function(X, FUN, ...) lapply(X, FUN, ...)
-# Not simply `.LAPPLY <- lapply` since it introduces .Internal()
+# Not simply `.LAPPLY <- lapply` or it becomes .Internal()
 .MAPPLY <- function(FUN, dots, MoreArgs=NULL)
 	.mapply(FUN, dots, MoreArgs)
 .onAttach <- function(libname, pkgname) {
@@ -8,9 +8,11 @@
 		packageStartupMessage("Running without parallel")
 	} else {
 		packageStartupMessage(
-			'Running with parallel, check options("mc.cores")')
-		.LAPPLY <- function(X, FUN, ...) parallel::mclapply(X, FUN, ...)
-		.MAPPLY <- function(FUN, dots, MoreArgs=NULL) {
+			'Running with parallels, check options("mc.cores")')
+		assignInMyNamespace(".LAPPLY",
+			function(X, FUN, ...) parallel::mclapply(X, FUN, ...))
+		assignInMyNamespace(".MAPPLY",
+			function(FUN, dots, MoreArgs=NULL) {
 			if (!length(dots)) return(list())
 			l <- lengths(dots)
 			n <- max(l)
@@ -25,7 +27,11 @@
 					function(x) x[idx]), MoreArgs)
 				do.call(c, parallel::mclapply(seq_len(n), f))
 			}
-		}	# Simplified from parallel::mcmapply()
+		})	# Simplified from parallel::mcmapply()
 	}
 	invisible()
 }
+# Error: package or namespace load failed for ‘garray’:
+#  .onAttach failed in attachNamespace() for 'garray', details:
+#   call: .LAPPLY <<- function(X, FUN, ...) parallel::mclapply(X, FUN, 
+#   error: cannot change value of locked binding for '.LAPPLY'
