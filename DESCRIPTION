@@ -2,7 +2,6 @@ Package: garray
 Type: Package
 Title: Generalized Array Arithmetic for Ragged Arrays with Named Margins
 Version: 1.1.1
-Date: 2018-08-11
 Author: Qingsheng Huang
 Maintainer: Qingsheng Huang <huangqqss@126.com>
 Depends:
