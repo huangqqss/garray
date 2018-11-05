@@ -1336,8 +1336,9 @@ awipe <- function(X, FUN="-", STATS="mean", MARGIN=NULL,
 #' n1 <- amult(a, c, `*`, sum)
 #' n2 <- a%X%c
 #' all.equal(n1, n2)
-#' amult(garray(1:5, margins="I"), garray(1:8,margins="J"))					     
-#' @keywords garray, `%*%`
+#' amult(garray(1:5,margins="I"), garray(1:8,margins="J"))
+#' amult(garray(1:8,c(I=2,J=4)), garray(1:9,c(K=3,L=3)))
+##@keywords garray, `%*%`
 amult <- function(X, Y, FUN="*", SUM="sum", BY=NULL,
 		MoreArgs=NULL, ..., SIMPLIFY=TRUE, VECTORIZED=TRUE) {
 	nX <- margins(X)
@@ -1351,9 +1352,14 @@ amult <- function(X, Y, FUN="*", SUM="sum", BY=NULL,
 	dnX <- dimnames(X)
 	dnY <- dimnames(Y)
 	sd <- c(sdim(X), sdim(Y))
-	if (identical("*",FUN)&&identical("sum",SUM)&&is.null(BY)
+	if (identical("*",FUN)&&identical("sum",SUM)&&0==length(BY)
 			&&all(dX[ni]==dY[ni])) {
-		if (length(nX)>2||length(nY)>2) {
+		if (length(ni)==1&&length(nX)==2&&length(nY)==2) {
+			FUN <- array(list(crossprod, `%*%`,
+				function(X,Y) t(Y%*%X), tcrossprod),
+				c(2,2))[nX==ni,nY==ni][[1]]
+			Z <- FUN(X, Y)
+		} else {
 			X <- aperm(X, perm=c(nx, ni))
 			Y <- aperm(Y, perm=c(ni, ny))
 			if (any(dX[ni]!=dY[ni])) {
@@ -1366,12 +1372,6 @@ amult <- function(X, Y, FUN="*", SUM="sum", BY=NULL,
 			attr(X, "dim") <- c(prod(dX[nx]), prod(d[ni]))
 			attr(Y, "dim") <- c(prod(d[ni]), prod(dY[ny]))
 			Z <- X%*%Y
-		} else {
-			#FIXME: error if length(nX)==1 || length(nY)==1
-			FUN <- array(list(crossprod, `%*%`,
-				function(X,Y) t(Y%*%X), tcrossprod),
-				c(2,2))[nX==ni,nY==ni][[1]]
-			Z <- FUN(X, Y)
 		}
 		dZ <- c(dX[nx],dY[ny])
 		names(dZ) <- NULL

@@ -9,9 +9,9 @@
 	} else {
 		packageStartupMessage(
 			'Running with parallels, check options("mc.cores")')
-		assignInMyNamespace(".LAPPLY",
+		utils::assignInMyNamespace(".LAPPLY",
 			function(X, FUN, ...) parallel::mclapply(X, FUN, ...))
-		assignInMyNamespace(".MAPPLY",
+		utils::assignInMyNamespace(".MAPPLY",
 			function(FUN, dots, MoreArgs=NULL) {
 			if (!length(dots)) return(list())
 			l <- lengths(dots)
