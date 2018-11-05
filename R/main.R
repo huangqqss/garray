@@ -1336,7 +1336,8 @@ awipe <- function(X, FUN="-", STATS="mean", MARGIN=NULL,
 #' n1 <- amult(a, c, `*`, sum)
 #' n2 <- a%X%c
 #' all.equal(n1, n2)
-# @keywords garray, `%*%`
+#' amult(garray(1:5, margins="I"), garray(1:8,margins="J"))					     
+#' @keywords garray, `%*%`
 amult <- function(X, Y, FUN="*", SUM="sum", BY=NULL,
 		MoreArgs=NULL, ..., SIMPLIFY=TRUE, VECTORIZED=TRUE) {
 	nX <- margins(X)
@@ -1366,6 +1367,7 @@ amult <- function(X, Y, FUN="*", SUM="sum", BY=NULL,
 			attr(Y, "dim") <- c(prod(d[ni]), prod(dY[ny]))
 			Z <- X%*%Y
 		} else {
+			#FIXME: error if length(nX)==1 || length(nY)==1
 			FUN <- array(list(crossprod, `%*%`,
 				function(X,Y) t(Y%*%X), tcrossprod),
 				c(2,2))[nX==ni,nY==ni][[1]]
