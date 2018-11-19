@@ -900,17 +900,17 @@ read.ctable <- function(file, header, row.names, col.names, ..., storagemode="do
 		colClasses="character", ...)
 	arr      <- unname(as.matrix(dat[-header[[1]],-header[[2]]]))
 	storage.mode(arr) <- storagemode
-	headrow  <- unname(as.matrix(dat[ header[[1]],-header[[2]]]))
-	headcol  <- unname(as.matrix(dat[-header[[1]], header[[2]]]))
+	headrow  <- unname(as.matrix(dat[-header[[1]], header[[2]]]))
+	headcol  <- unname(as.matrix(dat[ header[[1]],-header[[2]]]))
 	headhead <- unname(as.matrix(dat[ header[[1]], header[[2]]]))
 	dimnames <- c( lapply(row.names, function(i) {
 		if (is.numeric(i) && 1L==length(i)) {
-			i <- unique(headcol[,i])
+			i <- unique(headrow[,i])
 			i <- i[""!=i]	# neglect empty rownames
 		}
 		return(i) }), lapply(col.names, function(i) {
 		if (is.numeric(i) && 1L==length(i)) {
-			i <- unique(headrow[i,])
+			i <- unique(headcol[i,])
 			i <- i[""!=i]
 		}
 		return(i) }) )
