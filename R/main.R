@@ -1191,6 +1191,10 @@ areduce <- function(FUN, X, MARGIN, ..., SIMPLIFY=TRUE, SAFE=FALSE) {
 		d2 <- prod(d[n2])
 		class(X) <- NULL
 		dim(X) <- c(d0*d1, d2)
+		#FIXME: d0*d1 can be a huge number (>2^31-1), so become NA when `dim<-` coerce it to integer
+		#	and error (`dim<-` cannot accept double, which is possibly a bug).  I need to redesign the
+		#	algorithm to bypass the limitation.  The length of a object can be double, but
+		#	dimensions should be integers.
 		ngroup <- vector("list", sum(sdMARGIN))
 		names(ngroup) <- spd[MARGIN[sdMARGIN]]
 		group <- rep.int(1L, d0)
